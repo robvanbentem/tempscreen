@@ -3,6 +3,9 @@
 #include <Libraries/Adafruit_PCD8544/Adafruit_PCD8544.h>
 #include <Libraries/OneWire/OneWire.h>
 #include <Libraries/DS18S20/ds18s20.h>
+#include "user_interface.h"
+
+#define DS_PIN 0
 
 DS18S20 ReadTemp;
 Timer procTimer;
@@ -18,59 +21,37 @@ Adafruit_PCD8544 display = Adafruit_PCD8544(14, 13, 12, 5, 4);
 
 static const char degr_symbl[5] = {0x00, 0x07, 0x05, 0x07, 0x00};
 
-void readData() {
+void displayTemps() {
     uint8_t a;
-    uint64_t info;
 
-    if (!ReadTemp.MeasureStatus())  // the last measurement completed
-    {
+    if (!ReadTemp.MeasureStatus()) {
         display.clearDisplay();
         display.setCursor(0, 0);
 
-        if (ReadTemp.GetSensorsCount())   // is minimum 1 sensor detected ?
-            Serial.println("******************************************");
-
-        for (a = 0; a < ReadTemp.GetSensorsCount(); a++)   // prints for all sensors
-        {
-            Serial.print(" T");
-            Serial.print(a + 1);
-            Serial.print(" = ");
-            if (ReadTemp.IsValidTemperature(a))   // temperature read correctly ?
-            {
-                Serial.print(ReadTemp.GetCelsius(a));
-                Serial.print(" Celsius, (");
-                Serial.print(ReadTemp.GetFahrenheit(a));
-                Serial.println(" Fahrenheit)");
-
+        for (a = 0; a < ReadTemp.GetSensorsCount(); a++) {
+            if (ReadTemp.IsValidTemperature(a)) {
                 display.printf("T%d: %.2f %cC\n", a + 1, ReadTemp.GetCelsius(a), (char) 0x7f);
-                display.print(degr_symbl);
             }
-            else
-                Serial.println("Temperature not valid");
-
-            Serial.print(" <Sensor id.");
-
-            info = ReadTemp.GetSensorID(a) >> 32;
-            Serial.print((uint32_t) info, 16);
-            Serial.print((uint32_t) ReadTemp.GetSensorID(a), 16);
-            Serial.println(">");
         }
         display.display();
-        Serial.println("******************************************");
-        ReadTemp.StartMeasure();  // next measure, result after 1.2 seconds * number of sensors
     }
-    else
-        Serial.println("No valid Measure so far! wait please");
+    else {
+        display.println("Measure err.");
+        Serial.println("Measure err.");
+    }
 
 
 }
 
 
-void displayTest() {
+void initDisplay() {
     display.begin();
     display.setRotation(2);
     display.setContrast(5);
-    display.display(); // show splashscreen
+    display.clearDisplay();
+    display.setCursor(0, 0);
+    display.println("Measuring...");
+    display.display();
 }
 
 void init() {
@@ -80,12 +61,13 @@ void init() {
     WifiStation.enable(false);
     WifiAccessPoint.enable(false);
 
-    displayTest();
+    initDisplay();
 
-    ReadTemp.Init(16);
+    ReadTemp.Init(DS_PIN);
+    ReadTemp.StartMeasure();
 
-    ReadTemp.StartMeasure(); // first measure start,result after 1.2 seconds * number of sensors
-    procTimer.initializeMs(10000, readData).start();   // every 10 seconds
+    displayTemps();
 
+    system_deep_sleep(30 * 1000 * 1000);
 }
 
